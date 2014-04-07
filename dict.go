@@ -10,7 +10,7 @@ type Dict interface {
 	Get(name string, v Value) error
 	Has(name string) bool
 	Del(name string) error
-	Put(name string, v Value) error
+	Set(name string, v Value) error
 
 	Keys() []string
 	//Values() []Value
@@ -76,7 +76,7 @@ func (d *dict) Del(name string) error {
 	return err
 }
 
-func (d *dict) Put(name string, v Value) error {
+func (d *dict) Set(name string, v Value) error {
 	var err error
 	d.db[name] = v
 	return err

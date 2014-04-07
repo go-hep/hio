@@ -169,7 +169,7 @@ func (f *File) Get(name string, v Value) error {
 			return err
 		}
 
-		err = f.Put(name, v)
+		err = f.Set(name, v)
 		if err != nil {
 			return err
 		}
@@ -195,9 +195,9 @@ func (f *File) Del(name string) error {
 	return err
 }
 
-func (f *File) Put(name string, v Value) error {
+func (f *File) Set(name string, v Value) error {
 	//TODO(sbinet): check r/w file
-	err := f.dict.Put(name, v)
+	err := f.dict.Set(name, v)
 	if err != nil {
 		return err
 	}

@@ -54,11 +54,9 @@ func testFileOpen(t *testing.T, fname string) {
 		t.Fatalf("expected name %q. got %q", fname, f.Name())
 	}
 
+	fkeys := f.Keys()
 	keys := []string{"int64", "float64"}
 	sort.Strings(keys)
-
-	fkeys := f.Keys()
-	sort.Strings(fkeys)
 
 	if !reflect.DeepEqual(fkeys, keys) {
 		t.Fatalf("expected keys=%v. got %v.", keys, fkeys)
@@ -67,7 +65,7 @@ func testFileOpen(t *testing.T, fname string) {
 	for _, table := range g_table {
 		v := reflect.New(reflect.ValueOf(table.value).Type())
 		v.Elem().Set(reflect.ValueOf(table.value))
-		err = f.Put(table.name, v.Interface())
+		err = f.Set(table.name, v.Interface())
 		if err != nil {
 			t.Fatalf("could not put data [%s] into file: %v", table.name, err)
 		}
@@ -109,7 +107,7 @@ func testFileCreateAndFill(t *testing.T, fname string) {
 	for _, table := range g_table {
 		v := reflect.New(reflect.ValueOf(table.value).Type())
 		v.Elem().Set(reflect.ValueOf(table.value))
-		err = f.Put(table.name, v.Interface())
+		err = f.Set(table.name, v.Interface())
 		if err != nil {
 			t.Fatalf("could not put data [%s] into file: %v", table.name, err)
 		}
@@ -131,11 +129,9 @@ func testFileCreateAndFill(t *testing.T, fname string) {
 
 	}
 
+	fkeys := f.Keys()
 	keys := []string{"int64", "float64"}
 	sort.Strings(keys)
-
-	fkeys := f.Keys()
-	sort.Strings(fkeys)
 
 	if !reflect.DeepEqual(fkeys, keys) {
 		t.Fatalf("expected keys=%v. got %v.", keys, fkeys)
