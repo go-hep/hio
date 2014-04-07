@@ -2,7 +2,6 @@ package hio_test
 
 import (
 	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/go-hep/hio"
@@ -55,20 +54,14 @@ func testFileOpen(t *testing.T, fname string) {
 	}
 
 	fkeys := f.Keys()
-	keys := []string{"int64", "float64"}
-	sort.Strings(keys)
 
-	if !reflect.DeepEqual(fkeys, keys) {
-		t.Fatalf("expected keys=%v. got %v.", keys, fkeys)
+	if !reflect.DeepEqual(fkeys, g_keys) {
+		t.Fatalf("expected keys=%v. got %v.", g_keys, fkeys)
 	}
 
 	for _, table := range g_table {
 		v := reflect.New(reflect.ValueOf(table.value).Type())
 		v.Elem().Set(reflect.ValueOf(table.value))
-		err = f.Set(table.name, v.Interface())
-		if err != nil {
-			t.Fatalf("could not put data [%s] into file: %v", table.name, err)
-		}
 
 		w := reflect.New(reflect.ValueOf(table.value).Type())
 		err = f.Get(table.name, w.Interface())
@@ -130,11 +123,9 @@ func testFileCreateAndFill(t *testing.T, fname string) {
 	}
 
 	fkeys := f.Keys()
-	keys := []string{"int64", "float64"}
-	sort.Strings(keys)
 
-	if !reflect.DeepEqual(fkeys, keys) {
-		t.Fatalf("expected keys=%v. got %v.", keys, fkeys)
+	if !reflect.DeepEqual(fkeys, g_keys) {
+		t.Fatalf("expected keys=%v. got %v.", g_keys, fkeys)
 	}
 
 }
