@@ -1,6 +1,7 @@
 package hio
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/go-hep/rio"
@@ -8,7 +9,10 @@ import (
 
 type File struct {
 	f      *rio.Stream
-	Header FileHeader
+	mode   string
+	hdr    FileHeader
+	dict   dict
+	tosync map[string]struct{}
 }
 
 func Open(fname string) (*File, error) {
@@ -20,10 +24,17 @@ func Open(fname string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &File{
+	hfile := &File{
 		f:      f,
-		Header: fh,
-	}, err
+		mode:   "r",
+		hdr:    fh,
+		dict:   dict{make(map[string]Value)},
+		tosync: make(map[string]struct{}),
+	}
+	for _, key := range hfile.hdr.Keys {
+		hfile.dict.db[key] = nil
+	}
+	return hfile, err
 }
 
 func Create(fname string) (*File, error) {
@@ -31,10 +42,24 @@ func Create(fname string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &File{
-		f:      f,
-		Header: FileHeader{make([]string, 0)},
-	}, err
+
+	hfile := &File{
+		f:    f,
+		mode: "w",
+		hdr: FileHeader{
+			Version: g_version,
+			Keys:    make([]string, 0),
+		},
+		dict:   dict{make(map[string]Value)},
+		tosync: make(map[string]struct{}),
+	}
+
+	rec := hfile.f.Record("hio.FileHeader")
+	err = rec.Connect("hio.FileHeader", &hfile.hdr)
+	if err != nil {
+		return nil, err
+	}
+	return hfile, err
 }
 
 // Name returns the name of the file
@@ -50,7 +75,58 @@ func (f *File) Fd() uintptr {
 // Close closes the File, rendering it unusable for I/O.
 // It returns an error, if any
 func (f *File) Close() error {
-	return f.f.Close()
+	var err error
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+
+	// if file opened in write-mode, write header back
+	if f.mode == "w" {
+		rec := f.f.Record("hio.FileHeader")
+		if rec == nil {
+			err = fmt.Errorf("hio: could not retrieve hio.FileHeader record")
+			return err
+		}
+		err = f.f.WriteRecord(rec)
+		if err != nil {
+			return err
+		}
+
+		for k := range f.tosync {
+			rec := f.f.Record(k)
+			if rec == nil {
+				err = fmt.Errorf("hio: could not retrieve [%s] record", k)
+				return err
+			}
+
+			v, err := f.dict.get(k)
+			if err != nil {
+				return err
+			}
+
+			err = rec.Connect(k, v)
+			if err != nil {
+				return err
+			}
+			err = f.f.WriteRecord(rec)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = f.Sync()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = f.f.Close()
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 // Stat returns the FileInfo structure describing file. If there is an
@@ -65,5 +141,76 @@ func (f *File) Stat() (os.FileInfo, error) {
 func (f *File) Sync() error {
 	return f.f.Sync()
 }
+
+// Keys returns the list of objects contained in the file
+func (f *File) Keys() []string {
+	return f.hdr.Keys
+}
+
+func (f *File) Get(name string, v Value) error {
+	vv, err := f.dict.get(name)
+	if err != nil {
+		return err
+	}
+
+	if vv == nil {
+		// load from file
+		rec := f.f.Record(name)
+		if rec == nil {
+			return fmt.Errorf("hio: no such record [%s] on file [%s]", name, f.Name())
+		}
+		rec.SetUnpack(true)
+		err = rec.Connect(name, v)
+		if err != nil {
+			return err
+		}
+		_, err = f.f.ReadRecord()
+		if err != nil {
+			return err
+		}
+
+		err = f.Put(name, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	return f.dict.Get(name, v)
+}
+
+func (f *File) Has(name string) bool {
+	return f.dict.Has(name)
+}
+
+func (f *File) Del(name string) error {
+	//TODO(sbinet): check r/w file
+	err := f.dict.Del(name)
+	if err != nil {
+		return err
+	}
+	if _, ok := f.tosync[name]; ok {
+		delete(f.tosync, name)
+	}
+	f.hdr.Keys = f.dict.Keys()
+	return err
+}
+
+func (f *File) Put(name string, v Value) error {
+	//TODO(sbinet): check r/w file
+	err := f.dict.Put(name, v)
+	if err != nil {
+		return err
+	}
+	f.tosync[name] = struct{}{}
+	f.hdr.Keys = f.dict.Keys()
+	return err
+}
+
+func (f *File) Version() Version {
+	return f.hdr.Version
+}
+
+// check interfaces
+var _ Dict = (*File)(nil)
 
 // EOF
