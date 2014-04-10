@@ -1,10 +1,8 @@
-package hio_test
+package hio
 
 import (
 	"reflect"
 	"testing"
-
-	"github.com/go-hep/hio"
 )
 
 func TestFileOpen(t *testing.T) {
@@ -14,7 +12,7 @@ func TestFileOpen(t *testing.T) {
 
 func TestFileCreate(t *testing.T) {
 	const fname = "testdata/write-data-1.hio"
-	f, err := hio.Create(fname)
+	f, err := Create(fname)
 	if err != nil {
 		t.Fatalf("could not create file [%s]: %v", fname, err)
 	}
@@ -38,7 +36,7 @@ func TestFileCreateAndFill(t *testing.T) {
 }
 
 func testFileOpen(t *testing.T, fname string) {
-	f, err := hio.Open(fname)
+	f, err := Open(fname)
 	if err != nil {
 		t.Fatalf("could not open file [%s]: %v", fname, err)
 	}
@@ -82,7 +80,7 @@ func testFileOpen(t *testing.T, fname string) {
 
 func testFileCreateAndFill(t *testing.T, fname string) {
 
-	f, err := hio.Create(fname)
+	f, err := Create(fname)
 	if err != nil {
 		t.Fatalf("could not create file [%s]: %v", fname, err)
 	}

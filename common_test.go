@@ -1,4 +1,4 @@
-package hio_test
+package hio
 
 import (
 	"sort"
