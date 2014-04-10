@@ -1,7 +1,9 @@
 package hio
 
 import (
+	"os"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -33,6 +35,47 @@ func TestFileCreateAndFill(t *testing.T) {
 	const fname = "testdata/write-data-2.hio"
 	testFileCreateAndFill(t, fname)
 	testFileOpen(t, fname)
+}
+
+func TestFileInspect(t *testing.T) {
+	const fname = "testdata/file-inspect.hio"
+	defer os.RemoveAll(fname)
+	testFileCreateAndFill(t, fname)
+	testFileOpen(t, fname)
+
+	f, err := Open(fname)
+	if err != nil {
+		t.Fatalf("could not open file [%s]: %v", fname, err)
+	}
+	defer func() {
+		err = f.Close()
+		if err != nil {
+			t.Fatalf("could not close file [%s]: %v", fname, err)
+		}
+	}()
+
+	// goes through the whole file
+	_, _ = f.f.ReadRecord()
+
+	// rewind
+	_, err = f.f.Seek(0, 0)
+	if err != nil {
+		t.Fatalf("could not rewind file [%s]: %v", fname, err)
+	}
+
+	recnames := make([]string, 0)
+	for _, rec := range f.f.Records() {
+		recnames = append(recnames, rec.Name())
+	}
+	sort.Strings(recnames)
+
+	keys := []string{"hio.FileHeader"}
+	keys = append(keys, g_keys...)
+	sort.Strings(keys)
+
+	if !reflect.DeepEqual(recnames, keys) {
+		t.Fatalf("expected file [%s] content: %v. got=%v", fname, keys, recnames)
+	}
 }
 
 func testFileOpen(t *testing.T, fname string) {
