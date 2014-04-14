@@ -1,6 +1,9 @@
 package hio
 
 import (
+	"bufio"
+	"compress/zlib"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -390,6 +393,89 @@ func Benchmark__ReadTableStruct____(b *testing.B) {
 		err = table.Read(&data)
 		if err != nil && err != io.EOF {
 			b.Fatalf("[i=%d] could not read data: %v (%d)", i, err, table.Entries())
+		}
+	}
+}
+
+func Benchmark__WriteGob___________(b *testing.B) {
+	b.StopTimer()
+	var f io.WriteCloser
+	f, err := os.Create("testdata/simple.gob")
+	if err != nil {
+		b.Fatalf("could not create file: %v", err)
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err = enc.Encode(&i)
+		if err != nil {
+			b.Fatalf("[i=%d]: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__WriteGobBuffered___(b *testing.B) {
+	b.StopTimer()
+	f, err := os.Create("testdata/simple.buf.gob")
+	if err != nil {
+		b.Fatalf("could not create file: %v", err)
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(bufio.NewWriter(f))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err = enc.Encode(&i)
+		if err != nil {
+			b.Fatalf("[i=%d]: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__WriteComprGob______(b *testing.B) {
+	b.StopTimer()
+	f, err := os.Create("testdata/simple.gob.gz")
+	if err != nil {
+		b.Fatalf("could not create file: %v", err)
+	}
+	defer f.Close()
+
+	gzip := zlib.NewWriter(f)
+	defer gzip.Close()
+
+	enc := gob.NewEncoder(gzip)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err = enc.Encode(&i)
+		if err != nil {
+			b.Fatalf("[i=%d]: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__WriteComprBufGob___(b *testing.B) {
+	b.StopTimer()
+	f, err := os.Create("testdata/simple.buf.gob.gz")
+	if err != nil {
+		b.Fatalf("could not create file: %v", err)
+	}
+	defer f.Close()
+
+	gzip := zlib.NewWriter(bufio.NewWriter(f))
+	defer gzip.Close()
+
+	enc := gob.NewEncoder(gzip)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err = enc.Encode(&i)
+		if err != nil {
+			b.Fatalf("[i=%d]: %v", i, err)
 		}
 	}
 }
