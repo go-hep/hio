@@ -3,6 +3,7 @@ package hio
 import (
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -15,7 +16,7 @@ type tableData struct {
 
 func TestTable(t *testing.T) {
 	const fname = "testdata/write-table.hio"
-	//defer os.RemoveAll(fname)
+	defer os.RemoveAll(fname)
 	testTableCreate(t, fname)
 	testTableRead(t, fname)
 }
