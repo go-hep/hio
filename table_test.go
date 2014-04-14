@@ -6,9 +6,12 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/go-hep/dao"
 )
 
 type tableData struct {
@@ -145,6 +148,150 @@ func testTableRead(t *testing.T, fname string) {
 		if !reflect.DeepEqual(data, refdata) {
 			t.Fatalf("expected (n=%d):\nref=%v\new=%v", i, refdata, data)
 		}
+	}
+
+}
+
+func TestTableHist(t *testing.T) {
+	const fname = "testdata/table-hist.hio"
+	const nentries = 10
+	const tname = "my-table"
+	//os.RemoveAll(fname)
+
+	href := func() *dao.H1D {
+		f, err := Create(fname)
+		if err != nil {
+			t.Fatalf("could not create file [%s]: %v", fname, err)
+		}
+		defer func() {
+			err = f.Close()
+			if err != nil {
+				t.Fatalf("could not close file [%s]: %v", fname, err)
+			}
+		}()
+
+		if f.Name() != fname {
+			t.Fatalf("expected name %q. got %q", fname, f.Name())
+		}
+
+		table, err := NewTable(f, tname)
+		if err != nil {
+			t.Fatalf("could not create table [%s]: %v", fname, err)
+		}
+
+		if table.Name() != tname {
+			t.Fatalf("expected table name [%s]. got [%s]", tname, table.Name())
+		}
+
+		h := dao.NewH1D(100, 0, 100)
+		h.Annotation()["title"] = "histo title"
+		h.Annotation()["name"] = "histo name"
+
+		for i := 0; i < nentries; i++ {
+			h.Fill(rand.Float64()*100., 1.)
+		}
+
+		err = f.Set("histo-title", h)
+		if err != nil {
+			t.Fatalf("could not save histo: %v", err)
+		}
+
+		for i := 0; i < nentries; i++ {
+			data := tableData{
+				Ints: []int64{
+					int64(i) + 100,
+					int64(i) + 200,
+					int64(i) + 300,
+				},
+				Floats: []float64{
+					float64(i) + 100,
+					float64(i) + 200,
+					float64(i) + 300,
+				},
+				Strings: []string{
+					fmt.Sprintf("my-string-%d", i+100),
+					fmt.Sprintf("my-string-%d", i+200),
+					fmt.Sprintf("my-string-%d", i+300),
+				},
+			}
+			err = table.Write(&data)
+			if err != nil {
+				t.Fatalf("could not write to table [name=%s, i=%d]: %v", fname, i, err)
+			}
+		}
+
+		if table.Entries() != nentries {
+			t.Fatalf("expected [%d] entries. got [%d]", nentries, table.Entries())
+		}
+		return h
+	}()
+
+	hnew := func() *dao.H1D {
+
+		f, err := Open(fname)
+		if err != nil {
+			t.Fatalf("could not open file [%s]: %v", fname, err)
+		}
+		defer f.Close()
+
+		var h dao.H1D
+		err = f.Get("histo-title", &h)
+		if err != nil {
+			t.Fatalf("could not retrieve histo: %v", err)
+		}
+
+		var table Table
+		err = f.Get(tname, &table)
+		if err != nil {
+			t.Fatalf("could not retrieve table [name=%s, file=%s]: %v", tname, fname, err)
+		}
+
+		if table.Name() != tname {
+			t.Fatalf("expected table name [%s]. got [%s]", tname, table.Name())
+		}
+
+		if table.Entries() != nentries {
+			t.Fatalf("expected [%d] entries. got [%d]", nentries, table.Entries())
+		}
+		for i := 0; i < nentries+1; i++ {
+			refdata := tableData{
+				Ints: []int64{
+					int64(i) + 100,
+					int64(i) + 200,
+					int64(i) + 300,
+				},
+				Floats: []float64{
+					float64(i) + 100,
+					float64(i) + 200,
+					float64(i) + 300,
+				},
+				Strings: []string{
+					fmt.Sprintf("my-string-%d", i+100),
+					fmt.Sprintf("my-string-%d", i+200),
+					fmt.Sprintf("my-string-%d", i+300),
+				},
+			}
+			var data tableData
+			err = table.Read(&data)
+			if i == nentries {
+				if err != io.EOF {
+					t.Fatalf("read too many entries")
+				}
+				break
+			}
+			if err != nil {
+				t.Fatalf("could not read table [name=%s, i=%d]: %v", fname, i, err)
+			}
+
+			if !reflect.DeepEqual(data, refdata) {
+				t.Fatalf("expected (n=%d):\nref=%v\new=%v", i, refdata, data)
+			}
+		}
+		return &h
+	}()
+
+	if !reflect.DeepEqual(href, hnew) {
+		t.Fatalf("ref=%v\nnew=%v\n", href, hnew)
 	}
 
 }
