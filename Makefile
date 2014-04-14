@@ -1,5 +1,5 @@
 ## simple makefile to log workflow
-.PHONY: all test clean build
+.PHONY: all test clean build bench
 
 #GOFLAGS := $(GOFLAGS:-race -v)
 
@@ -14,5 +14,8 @@ test: build
 
 clean:
 	@go clean $(GOFLAGS) -i ./...
+
+bench: build
+	@go test $(GOFLAGS) -bench=.
 
 ## EOF
