@@ -72,7 +72,7 @@ func TestFileInspect(t *testing.T) {
 	}
 	sort.Strings(recnames)
 
-	keys := []string{"hio.FileHeader"}
+	keys := []string{"hio.FileHeader", "hio.FileFooter"}
 	keys = append(keys, g_keys...)
 	sort.Strings(keys)
 

@@ -6,14 +6,12 @@ import (
 
 type FileHeader struct {
 	Version Version
-	Keys    []string
+	Pos     int64 // footer position on-file
 }
 
 func newFileHeaderFrom(stream *rio.Stream) (FileHeader, error) {
 	var err error
-	hdr := FileHeader{
-		Keys: make([]string, 0),
-	}
+	hdr := FileHeader{}
 
 	rec := stream.Record("hio.FileHeader")
 	rec.SetUnpack(true)
@@ -32,9 +30,7 @@ func newFileHeaderFrom(stream *rio.Stream) (FileHeader, error) {
 
 func newFileHeader(stream *rio.Stream) (FileHeader, error) {
 	var err error
-	hdr := FileHeader{
-		Keys: make([]string, 0),
-	}
+	hdr := FileHeader{}
 
 	rec := stream.Record("hio.FileHeader")
 	rec.SetUnpack(true)

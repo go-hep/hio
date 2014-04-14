@@ -10,7 +10,8 @@ import (
 type File struct {
 	f      *rio.Stream
 	mode   string
-	hdr    FileHeader
+	header FileHeader
+	footer FileFooter
 	dict   dict
 	tosync map[string]struct{}
 }
@@ -20,19 +21,40 @@ func Open(fname string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fh, err := newFileHeaderFrom(f)
 	if err != nil {
 		return nil, err
 	}
+
+	pos := f.CurPos()
+
+	_, err = f.Seek(fh.Pos, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	ft, err := newFileFooterFrom(f)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = f.Seek(pos, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	hfile := &File{
 		f:      f,
 		mode:   "r",
-		hdr:    fh,
+		header: fh,
+		footer: ft,
 		dict:   dict{make(map[string]Value)},
 		tosync: make(map[string]struct{}),
 	}
-	for _, key := range hfile.hdr.Keys {
-		hfile.dict.db[key] = nil
+
+	for _, key := range hfile.footer.Keys {
+		hfile.dict.db[key.Name] = nil
 	}
 	return hfile, err
 }
@@ -46,19 +68,33 @@ func Create(fname string) (*File, error) {
 	hfile := &File{
 		f:    f,
 		mode: "w",
-		hdr: FileHeader{
+		header: FileHeader{
 			Version: g_version,
-			Keys:    make([]string, 0),
+		},
+		footer: FileFooter{
+			Keys: make([]fileEntry, 0),
 		},
 		dict:   dict{make(map[string]Value)},
 		tosync: make(map[string]struct{}),
 	}
 
 	rec := hfile.f.Record("hio.FileHeader")
-	err = rec.Connect("hio.FileHeader", &hfile.hdr)
+	err = rec.Connect("hio.FileHeader", &hfile.header)
 	if err != nil {
 		return nil, err
 	}
+
+	err = hfile.f.WriteRecord(rec)
+	if err != nil {
+		return nil, err
+	}
+
+	rec = hfile.f.Record("hio.FileFooter")
+	err = rec.Connect("hio.FileFooter", &hfile.footer)
+	if err != nil {
+		return nil, err
+	}
+
 	return hfile, err
 }
 
@@ -83,16 +119,8 @@ func (f *File) Close() error {
 
 	// if file opened in write-mode, write header back
 	if f.mode == "w" {
-		rec := f.f.Record("hio.FileHeader")
-		if rec == nil {
-			err = fmt.Errorf("hio: could not retrieve hio.FileHeader record")
-			return err
-		}
-		err = f.f.WriteRecord(rec)
-		if err != nil {
-			return err
-		}
 
+		entries := make([]fileEntry, 0, len(f.tosync))
 		for k := range f.tosync {
 			rec := f.f.Record(k)
 			if rec == nil {
@@ -100,6 +128,7 @@ func (f *File) Close() error {
 				return err
 			}
 
+			pos := f.f.CurPos()
 			v, err := f.dict.get(k)
 			if err != nil {
 				return err
@@ -113,6 +142,48 @@ func (f *File) Close() error {
 			if err != nil {
 				return err
 			}
+			entries = append(entries,
+				fileEntry{
+					Name: k,
+					Pos:  pos,
+					Len:  f.f.CurPos() - pos,
+				},
+			)
+		}
+
+		f.header.Pos = f.f.CurPos()
+		_, err = f.f.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+
+		rec := f.f.Record("hio.FileHeader")
+		if rec == nil {
+			err = fmt.Errorf("hio: could not retrieve hio.FileHeader record")
+			return err
+		}
+		err = f.f.WriteRecord(rec)
+		if err != nil {
+			return err
+		}
+
+		if f.header.Pos != 0 {
+			_, err = f.f.Seek(f.header.Pos, 0)
+			if err != nil {
+				return err
+			}
+		}
+
+		rec = f.f.Record("hio.FileFooter")
+		if rec == nil {
+			err = fmt.Errorf("hio: could not retrieve hio.FileHeader record")
+			return err
+		}
+		f.footer.Keys = append(f.footer.Keys, entries...)
+
+		err = f.f.WriteRecord(rec)
+		if err != nil {
+			return err
 		}
 
 		err = f.Sync()
@@ -144,7 +215,7 @@ func (f *File) Sync() error {
 
 // Keys returns the list of objects contained in the file
 func (f *File) Keys() []string {
-	return f.hdr.Keys
+	return f.dict.Keys()
 }
 
 func (f *File) Get(name string, v Value) error {
@@ -191,7 +262,6 @@ func (f *File) Del(name string) error {
 	if _, ok := f.tosync[name]; ok {
 		delete(f.tosync, name)
 	}
-	f.hdr.Keys = f.dict.Keys()
 	return err
 }
 
@@ -202,12 +272,11 @@ func (f *File) Set(name string, v Value) error {
 		return err
 	}
 	f.tosync[name] = struct{}{}
-	f.hdr.Keys = f.dict.Keys()
 	return err
 }
 
 func (f *File) Version() Version {
-	return f.hdr.Version
+	return f.header.Version
 }
 
 // check interfaces
