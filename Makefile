@@ -16,6 +16,6 @@ clean:
 	@go clean $(GOFLAGS) -i ./...
 
 bench: build
-	@go test $(GOFLAGS) -bench=.
+	@go test $(GOFLAGS) -bench=. -benchmem
 
 ## EOF
