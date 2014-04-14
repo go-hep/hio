@@ -13,7 +13,8 @@ type File struct {
 	header FileHeader
 	footer FileFooter
 	dict   dict
-	tosync map[string]struct{}
+	tosync map[string]int64
+	tables map[string]int64
 }
 
 func Open(fname string) (*File, error) {
@@ -50,7 +51,8 @@ func Open(fname string) (*File, error) {
 		header: fh,
 		footer: ft,
 		dict:   dict{make(map[string]Value)},
-		tosync: make(map[string]struct{}),
+		tosync: make(map[string]int64),
+		tables: make(map[string]int64),
 	}
 
 	for _, key := range hfile.footer.Keys {
@@ -75,7 +77,8 @@ func Create(fname string) (*File, error) {
 			Keys: make([]fileEntry, 0),
 		},
 		dict:   dict{make(map[string]Value)},
-		tosync: make(map[string]struct{}),
+		tosync: make(map[string]int64),
+		tables: make(map[string]int64),
 	}
 
 	rec := hfile.f.Record("hio.FileHeader")
@@ -120,7 +123,50 @@ func (f *File) Close() error {
 	// if file opened in write-mode, write header back
 	if f.mode == "w" {
 
-		entries := make([]fileEntry, 0, len(f.tosync))
+		curpos := f.f.CurPos()
+		entries := make([]fileEntry, 0, len(f.tosync)+len(f.tables))
+		for k, pos := range f.tables {
+			hdr := "hio.Header/" + k
+			rec := f.f.Record(hdr)
+			if rec == nil {
+				err = fmt.Errorf("hio: could not retrieve [%s] record", k)
+				return err
+			}
+
+			v, err := f.dict.get(k)
+			if err != nil {
+				return err
+			}
+
+			table := v.(*Table)
+			err = rec.Connect(hdr, &table.hdr)
+			if err != nil && err != rio.ErrBlockConnected {
+				return err
+			}
+
+			_, err = f.f.Seek(pos, 0)
+			if err != nil {
+				return err
+			}
+
+			err = f.f.WriteRecord(rec)
+			if err != nil {
+				return err
+			}
+
+			entries = append(entries,
+				fileEntry{
+					Name: k,
+					Pos:  pos,
+					Len:  f.f.CurPos() - pos,
+				},
+			)
+		}
+		_, err = f.f.Seek(curpos, 0)
+		if err != nil {
+			return err
+		}
+
 		for k := range f.tosync {
 			rec := f.f.Record(k)
 			if rec == nil {
@@ -138,6 +184,7 @@ func (f *File) Close() error {
 			if err != nil {
 				return err
 			}
+
 			err = f.f.WriteRecord(rec)
 			if err != nil {
 				return err
@@ -225,25 +272,57 @@ func (f *File) Get(name string, v Value) error {
 	}
 
 	if vv == nil {
-		// load from file
-		rec := f.f.Record(name)
-		if rec == nil {
-			return fmt.Errorf("hio: no such record [%s] on file [%s]", name, f.Name())
-		}
-		rec.SetUnpack(true)
-		err = rec.Connect(name, v)
-		if err != nil {
-			return err
-		}
-		_, err = f.f.ReadRecord()
-		if err != nil {
-			return err
-		}
+		if table, ok := v.(*Table); ok {
+			// load from file
+			hdrname := "hio.Header/" + name
+			rec := f.f.Record(hdrname)
+			if rec == nil {
+				return fmt.Errorf("hio: no such record [%s] on file [%s]", name, f.Name())
+			}
+			rec.SetUnpack(true)
+			err = rec.Connect(hdrname, &table.hdr)
+			if err != nil {
+				return err
+			}
+			_, err = f.f.ReadRecord()
+			if err != nil {
+				return err
+			}
 
-		err = f.Set(name, v)
+			err = f.dict.Set(name, table)
+			if err != nil {
+				return err
+			}
+		} else {
+			// load from file
+			rec := f.f.Record(name)
+			if rec == nil {
+				return fmt.Errorf("hio: no such record [%s] on file [%s]", name, f.Name())
+			}
+			rec.SetUnpack(true)
+			err = rec.Connect(name, v)
+			if err != nil {
+				return err
+			}
+			_, err = f.f.ReadRecord()
+			if err != nil {
+				return err
+			}
+
+			err = f.dict.Set(name, v)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if table, ok := v.(*Table); ok {
+		stream, err := rio.Open(f.f.Name())
 		if err != nil {
 			return err
 		}
+		table.setStream(stream)
+		table.doclose = true
 	}
 
 	return f.dict.Get(name, v)
@@ -271,7 +350,24 @@ func (f *File) Set(name string, v Value) error {
 	if err != nil {
 		return err
 	}
-	f.tosync[name] = struct{}{}
+	pos := f.f.CurPos()
+	if table, ok := v.(*Table); ok {
+		f.tables[name] = pos
+		hdrname := "hio.Header/" + name
+		rec := f.f.Record(hdrname)
+		err = rec.Connect(hdrname, &table.hdr)
+		if err != nil {
+			return err
+		}
+		err = f.f.WriteRecord(rec)
+		if err != nil {
+			return err
+		}
+
+		_ = f.f.Record(name)
+	} else {
+		f.tosync[name] = pos
+	}
 	return err
 }
 
