@@ -94,6 +94,7 @@ func (table *Table) Write(ptr interface{}) error {
 		if rec == nil {
 			return fmt.Errorf("hio: no such table [%s]", table.hdr.Name)
 		}
+		rec.SetCompress(true)
 		table.rec = rec
 	}
 	rec := table.rec
