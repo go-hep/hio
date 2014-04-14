@@ -146,4 +146,252 @@ func testTableRead(t *testing.T, fname string) {
 
 }
 
+func Benchmark__WriteTableInt64____(b *testing.B) {
+	const fname = "testdata/bench-write-table-int64.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Create(fname)
+	if err != nil {
+		b.Fatalf("could not create file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	table, err := NewTable(f, tname)
+	if err != nil {
+		b.Fatalf("could not create table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		data := int64(i)
+		err = table.Write(&data)
+		if err != nil {
+			b.Fatalf("[i=%d] could not write data: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__ReadTableInt64_____(b *testing.B) {
+	const fname = "testdata/bench-write-table-int64.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Open(fname)
+	if err != nil {
+		b.Fatalf("could not open file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	var table Table
+	err = f.Get(tname, &table)
+	if err != nil {
+		b.Fatalf("could not retrieve table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		data := int64(0)
+		err = table.Read(&data)
+		if err != nil && err != io.EOF {
+			b.Fatalf("[i=%d] could not read data: %v (%d)", i, err, table.Entries())
+		}
+	}
+}
+
+func Benchmark__WriteTableFloat64__(b *testing.B) {
+	const fname = "testdata/bench-write-table-float64.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Create(fname)
+	if err != nil {
+		b.Fatalf("could not create file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	table, err := NewTable(f, tname)
+	if err != nil {
+		b.Fatalf("could not create table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		data := float64(i)
+		err = table.Write(&data)
+		if err != nil {
+			b.Fatalf("[i=%d] could not write data: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__ReadTableFloat64___(b *testing.B) {
+	const fname = "testdata/bench-write-table-float64.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Open(fname)
+	if err != nil {
+		b.Fatalf("could not open file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	var table Table
+	err = f.Get(tname, &table)
+	if err != nil {
+		b.Fatalf("could not retrieve table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		data := float64(0)
+		err = table.Read(&data)
+		if err != nil && err != io.EOF {
+			b.Fatalf("[i=%d] could not read data: %v (%d)", i, err, table.Entries())
+		}
+	}
+}
+
+func Benchmark__WriteTableBlob4k___(b *testing.B) {
+	const fname = "testdata/bench-write-table-blob4k.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Create(fname)
+	if err != nil {
+		b.Fatalf("could not create file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	table, err := NewTable(f, tname)
+	if err != nil {
+		b.Fatalf("could not create table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	data := [4 * 1024]byte{}
+	for i := 0; i < b.N; i++ {
+		err = table.Write(&data)
+		if err != nil {
+			b.Fatalf("[i=%d] could not write data: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__ReadTableBlob4k____(b *testing.B) {
+	const fname = "testdata/bench-write-table-blob4k.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Open(fname)
+	if err != nil {
+		b.Fatalf("could not open file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	var table Table
+	err = f.Get(tname, &table)
+	if err != nil {
+		b.Fatalf("could not retrieve table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	data := [4 * 1024]byte{}
+	for i := 0; i < b.N; i++ {
+		err = table.Read(&data)
+		if err != nil && err != io.EOF {
+			b.Fatalf("[i=%d] could not read data: %v (%d)", i, err, table.Entries())
+		}
+	}
+}
+
+func Benchmark__WriteTableStruct___(b *testing.B) {
+	const fname = "testdata/bench-write-table-struct.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Create(fname)
+	if err != nil {
+		b.Fatalf("could not create file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	table, err := NewTable(f, tname)
+	if err != nil {
+		b.Fatalf("could not create table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	data := struct {
+		Int    int64
+		Float  float64
+		String string
+	}{
+		String: "some data",
+	}
+	for i := 0; i < b.N; i++ {
+		data.Int = int64(i)
+		data.Float = float64(i)
+		err = table.Write(&data)
+		if err != nil {
+			b.Fatalf("[i=%d] could not write data: %v", i, err)
+		}
+	}
+}
+
+func Benchmark__ReadTableStruct____(b *testing.B) {
+	const fname = "testdata/bench-write-table-struct.hio"
+	const tname = "my-table"
+	//defer os.RemoveAll(fname)
+
+	b.StopTimer()
+	f, err := Open(fname)
+	if err != nil {
+		b.Fatalf("could not open file [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	var table Table
+	err = f.Get(tname, &table)
+	if err != nil {
+		b.Fatalf("could not retrieve table [%s]: %v", tname, err)
+	}
+	defer table.Close()
+
+	b.StartTimer()
+
+	data := struct {
+		Int    int64
+		Float  float64
+		String string
+	}{}
+	for i := 0; i < b.N; i++ {
+		err = table.Read(&data)
+		if err != nil && err != io.EOF {
+			b.Fatalf("[i=%d] could not read data: %v (%d)", i, err, table.Entries())
+		}
+	}
+}
+
 // EOF
