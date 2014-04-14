@@ -13,6 +13,7 @@ type File struct {
 	header FileHeader
 	footer FileFooter
 	dict   dict
+	begin  int64 // start of file payload
 	tosync map[string]int64
 	tables map[string]int64
 }
@@ -28,7 +29,7 @@ func Open(fname string) (*File, error) {
 		return nil, err
 	}
 
-	pos := f.CurPos()
+	begin := f.CurPos()
 
 	_, err = f.Seek(fh.Pos, 0)
 	if err != nil {
@@ -40,7 +41,7 @@ func Open(fname string) (*File, error) {
 		return nil, err
 	}
 
-	_, err = f.Seek(pos, 0)
+	_, err = f.Seek(begin, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +52,7 @@ func Open(fname string) (*File, error) {
 		header: fh,
 		footer: ft,
 		dict:   dict{make(map[string]Value)},
+		begin:  begin,
 		tosync: make(map[string]int64),
 		tables: make(map[string]int64),
 	}
@@ -91,6 +93,7 @@ func Create(fname string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	hfile.begin = hfile.f.CurPos()
 
 	rec = hfile.f.Record("hio.FileFooter")
 	err = rec.Connect("hio.FileFooter", &hfile.footer)
@@ -273,6 +276,14 @@ func (f *File) Get(name string, v Value) error {
 
 	if vv == nil {
 		if table, ok := v.(*Table); ok {
+			pos := f.f.CurPos()
+			defer f.f.Seek(pos, 0)
+
+			_, err = f.f.Seek(f.begin, 0)
+			if err != nil {
+				return err
+			}
+
 			// load from file
 			hdrname := "hio.Header/" + name
 			rec := f.f.Record(hdrname)
