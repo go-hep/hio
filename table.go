@@ -111,7 +111,6 @@ func (table *Table) Write(ptr interface{}) error {
 
 func (table *Table) Read(ptr interface{}) error {
 
-	//fmt.Printf("table.read(%q) - pos=%d...\n", table.hdr.Name, table.stream.CurPos())
 	if table.rec == nil {
 		rec := table.stream.Record(table.hdr.Name)
 		if rec == nil {
