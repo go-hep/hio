@@ -275,7 +275,7 @@ func TestTableHist(t *testing.T) {
 			err = table.Read(&data)
 			if i == nentries {
 				if err != io.EOF {
-					t.Fatalf("read too many entries")
+					t.Fatalf("read too many entries (err=%#v)", err)
 				}
 				break
 			}
