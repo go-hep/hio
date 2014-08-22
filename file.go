@@ -14,8 +14,8 @@ type File struct {
 	footer FileFooter
 	dict   dict
 	begin  int64 // start of file payload
-	tosync map[string]int64
-	tables map[string]int64
+	tosync omap
+	tables omap
 }
 
 func Open(fname string) (*File, error) {
@@ -53,8 +53,8 @@ func Open(fname string) (*File, error) {
 		footer: ft,
 		dict:   dict{make(map[string]Value)},
 		begin:  begin,
-		tosync: make(map[string]int64),
-		tables: make(map[string]int64),
+		tosync: newomap(),
+		tables: newomap(),
 	}
 
 	for _, key := range hfile.footer.Keys {
@@ -79,8 +79,8 @@ func Create(fname string) (*File, error) {
 			Keys: make([]fileEntry, 0),
 		},
 		dict:   dict{make(map[string]Value)},
-		tosync: make(map[string]int64),
-		tables: make(map[string]int64),
+		tosync: newomap(),
+		tables: newomap(),
 	}
 
 	rec := hfile.f.Record("hio.FileHeader")
@@ -127,8 +127,10 @@ func (f *File) Close() error {
 	if f.mode == "w" {
 
 		curpos := f.f.CurPos()
-		entries := make([]fileEntry, 0, len(f.tosync)+len(f.tables))
-		for k, pos := range f.tables {
+		entries := make([]fileEntry, 0, f.tosync.Len()+f.tables.Len())
+		for _, item := range f.tables.d {
+			k := item.k
+			pos := item.v
 			hdr := "hio.Header/" + k
 			rec := f.f.Record(hdr)
 			if rec == nil {
@@ -170,7 +172,7 @@ func (f *File) Close() error {
 			return err
 		}
 
-		for k := range f.tosync {
+		for _, k := range f.tosync.keys() {
 			rec := f.f.Record(k)
 			if rec == nil {
 				err = fmt.Errorf("hio: could not retrieve [%s] record", k)
@@ -349,8 +351,8 @@ func (f *File) Del(name string) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := f.tosync[name]; ok {
-		delete(f.tosync, name)
+	if f.tosync.has(name) {
+		f.tosync.del(name)
 	}
 	return err
 }
@@ -363,7 +365,7 @@ func (f *File) Set(name string, v Value) error {
 	}
 	pos := f.f.CurPos()
 	if table, ok := v.(*Table); ok {
-		f.tables[name] = pos
+		f.tables.add(name, pos)
 		hdrname := "hio.Header/" + name
 		rec := f.f.Record(hdrname)
 		err = rec.Connect(hdrname, &table.hdr)
@@ -377,7 +379,7 @@ func (f *File) Set(name string, v Value) error {
 
 		_ = f.f.Record(name)
 	} else {
-		f.tosync[name] = pos
+		f.tosync.add(name, pos)
 	}
 	return err
 }
