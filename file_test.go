@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/go-hep/dao"
+	"github.com/go-hep/hbook"
 )
 
 func TestFileOpen(t *testing.T) {
@@ -174,19 +174,19 @@ func testFileCreateAndFill(t *testing.T, fname string) {
 
 }
 
-func TestRWDao(t *testing.T) {
+func TestRWHbook(t *testing.T) {
 	const nentries = 50
-	const fname = "testdata/write-dao.hio"
+	const fname = "testdata/write-hbook.hio"
 	defer os.RemoveAll(fname)
 
-	href := func() *dao.H1D {
+	href := func() *hbook.H1D {
 		f, err := Create(fname)
 		if err != nil {
 			t.Fatalf("could not create file [%s]: %v", fname, err)
 		}
 		defer f.Close()
 
-		h := dao.NewH1D(100, 0, 100)
+		h := hbook.NewH1D(100, 0, 100)
 		h.Annotation()["title"] = "histo title"
 		h.Annotation()["name"] = "histo name"
 
@@ -201,14 +201,14 @@ func TestRWDao(t *testing.T) {
 		return h
 	}()
 
-	hnew := func() *dao.H1D {
+	hnew := func() *hbook.H1D {
 		f, err := Open(fname)
 		if err != nil {
 			t.Fatalf("could not open file [%s]: %v", fname, err)
 		}
 		defer f.Close()
 
-		var h dao.H1D
+		var h hbook.H1D
 		err = f.Get("histo-title", &h)
 		if err != nil {
 			t.Fatalf("could not retrieve histo: %v", err)
