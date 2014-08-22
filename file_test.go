@@ -222,4 +222,37 @@ func TestRWHbook(t *testing.T) {
 	}
 }
 
+func TestFileGetSet(t *testing.T) {
+	const fname = "testdata/read-data.hio"
+	f, err := Open(fname)
+	if err != nil {
+		t.Fatalf("could not open [%s]: %v", fname, err)
+	}
+	defer f.Close()
+
+	key := "new-histo"
+	h := hbook.NewH1D(100, 0., 100.)
+	err = f.Set(key, h)
+	if err == nil {
+		t.Fatalf("should not be able to add new data to a read-only file")
+	}
+
+	key = "int64"
+	var i int64
+	err = f.Get(key, &i)
+	if err != nil {
+		t.Fatalf("could not retrieve [%s]: %v", key, err)
+	}
+
+	err = f.Set(key, &i)
+	if err == nil {
+		t.Fatalf("should not be able to modify data from a read-only file")
+	}
+
+	err = f.Del(key)
+	if err == nil {
+		t.Fatalf("should not be able to remove data from a read-only file")
+	}
+}
+
 // EOF
