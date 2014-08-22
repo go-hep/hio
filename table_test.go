@@ -158,9 +158,6 @@ func TestTableHist(t *testing.T) {
 	const tname = "my-table"
 	//os.RemoveAll(fname)
 
-	// FIXME(sbinet)
-	t.Skip("not ready for prime-time")
-
 	href := func() *hbook.H1D {
 		f, err := Create(fname)
 		if err != nil {
@@ -305,9 +302,6 @@ func Test2Tables(t *testing.T) {
 	const tname1 = "my-table-1"
 	const tname2 = "my-table-2"
 	//os.RemoveAll(fname)
-
-	// FIXME(sbinet)
-	t.Skip("not ready for prime-time")
 
 	func() {
 		f, err := Create(fname)
