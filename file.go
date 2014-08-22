@@ -346,7 +346,10 @@ func (f *File) Has(name string) bool {
 }
 
 func (f *File) Del(name string) error {
-	//TODO(sbinet): check r/w file
+	if f.mode != "w" {
+		return fmt.Errorf("hio: only writable files can delete keys")
+	}
+
 	err := f.dict.Del(name)
 	if err != nil {
 		return err
@@ -358,7 +361,10 @@ func (f *File) Del(name string) error {
 }
 
 func (f *File) Set(name string, v Value) error {
-	//TODO(sbinet): check r/w file
+	if f.mode != "w" {
+		return fmt.Errorf("hio: only writable files can add/modify keys")
+	}
+
 	err := f.dict.Set(name, v)
 	if err != nil {
 		return err
