@@ -14,8 +14,8 @@ type File struct {
 	footer FileFooter
 	dict   dict
 	begin  int64 // start of file payload
-	tosync omap
-	tables omap
+	tosync pmap
+	tables pmap
 }
 
 func Open(fname string) (*File, error) {
@@ -51,14 +51,14 @@ func Open(fname string) (*File, error) {
 		mode:   "r",
 		header: fh,
 		footer: ft,
-		dict:   dict{make(map[string]Value)},
+		dict:   newdict(),
 		begin:  begin,
-		tosync: newomap(),
-		tables: newomap(),
+		tosync: newpmap(),
+		tables: newpmap(),
 	}
 
 	for _, key := range hfile.footer.Keys {
-		hfile.dict.db[key.Name] = nil
+		hfile.dict.Set(key.Name, nil)
 	}
 	return hfile, err
 }
@@ -78,9 +78,9 @@ func Create(fname string) (*File, error) {
 		footer: FileFooter{
 			Keys: make([]fileEntry, 0),
 		},
-		dict:   dict{make(map[string]Value)},
-		tosync: newomap(),
-		tables: newomap(),
+		dict:   newdict(),
+		tosync: newpmap(),
+		tables: newpmap(),
 	}
 
 	rec := hfile.f.Record("hio.FileHeader")
@@ -128,7 +128,7 @@ func (f *File) Close() error {
 
 		curpos := f.f.CurPos()
 		entries := make([]fileEntry, 0, f.tosync.Len()+f.tables.Len())
-		for _, item := range f.tables.d {
+		for _, item := range f.tables.slice {
 			k := item.k
 			pos := item.v
 			hdr := "hio.Header/" + k
@@ -371,7 +371,7 @@ func (f *File) Set(name string, v Value) error {
 	}
 	pos := f.f.CurPos()
 	if table, ok := v.(*Table); ok {
-		f.tables.add(name, pos)
+		f.tables.set(name, pos)
 		hdrname := "hio.Header/" + name
 		rec := f.f.Record(hdrname)
 		err = rec.Connect(hdrname, &table.hdr)
@@ -385,7 +385,7 @@ func (f *File) Set(name string, v Value) error {
 
 		_ = f.f.Record(name)
 	} else {
-		f.tosync.add(name, pos)
+		f.tosync.set(name, pos)
 	}
 	return err
 }

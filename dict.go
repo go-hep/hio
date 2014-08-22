@@ -21,23 +21,45 @@ type Value interface {
 	//Value() reflect.Value
 }
 
+type ditem struct {
+	k string
+	v Value
+}
+
 type dict struct {
-	db map[string]Value
+	slice []ditem
+}
+
+func newdict() dict {
+	return dict{
+		slice: make([]ditem, 0),
+	}
+}
+
+func (d dict) getidx(name string) int {
+	for idx, item := range d.slice {
+		if item.k == name {
+			return idx
+		}
+	}
+	return -1
 }
 
 func (d dict) get(name string) (Value, error) {
-	v, ok := d.db[name]
-	if !ok {
+	i := d.getidx(name)
+	if i < 0 {
 		return nil, fmt.Errorf("hio: no such key [%s]", name)
 	}
-	return v, nil
+
+	return d.slice[i].v, nil
 }
 
 func (d dict) Get(name string, v Value) error {
-	vv, ok := d.db[name]
-	if !ok || vv == nil {
+	idx := d.getidx(name)
+	if idx < 0 {
 		return fmt.Errorf("hio: no such key [%s]", name)
 	}
+	vv := d.slice[idx].v
 
 	rv := reflect.ValueOf(vv)
 	rr := reflect.Indirect(rv)
@@ -62,30 +84,37 @@ func (d dict) Get(name string, v Value) error {
 }
 
 func (d dict) Has(name string) bool {
-	_, ok := d.db[name]
-	return ok
+	idx := d.getidx(name)
+	return idx >= 0
 }
 
 func (d *dict) Del(name string) error {
 	var err error
-	if _, ok := d.db[name]; ok {
-		delete(d.db, name)
-	} else {
+	i := d.getidx(name)
+	if i < 0 {
 		return fmt.Errorf("hio: no such key [%s]", name)
 	}
+
+	d.slice = append(d.slice[:i], d.slice[i+1:]...)
+
 	return err
 }
 
 func (d *dict) Set(name string, v Value) error {
 	var err error
-	d.db[name] = v
+	i := d.getidx(name)
+	if i >= 0 {
+		d.slice[i].v = v
+	} else {
+		d.slice = append(d.slice, ditem{k: name, v: v})
+	}
 	return err
 }
 
 func (d dict) Keys() []string {
-	keys := make([]string, 0, len(d.db))
-	for k := range d.db {
-		keys = append(keys, k)
+	keys := make([]string, 0, len(d.slice))
+	for _, item := range d.slice {
+		keys = append(keys, item.k)
 	}
 	sort.Strings(keys)
 	return keys
