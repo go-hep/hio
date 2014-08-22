@@ -158,7 +158,8 @@ func TestTableHist(t *testing.T) {
 	const tname = "my-table"
 	//os.RemoveAll(fname)
 
-	t.Skip("table+hist disabled")
+	// FIXME(sbinet)
+	t.Skip("not ready for prime-time")
 
 	href := func() *hbook.H1D {
 		f, err := Create(fname)
